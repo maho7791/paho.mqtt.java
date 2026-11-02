@@ -14,6 +14,7 @@
  *    Dave Locke - initial API and implementation and/or initial documentation
  *    Ian Craggs - MQTT 3.1.1 support
  *    James Sutton - Automatic Reconnect & Offline Buffering
+ *    Mark Hoffmann - automaticResubscribe option
  */
 package org.eclipse.paho.client.mqttv3;
 
@@ -73,6 +74,7 @@ public class MqttConnectOptions {
 	private String[] serverURIs = null;
 	private int mqttVersion = MQTT_VERSION_DEFAULT;
 	private boolean automaticReconnect = false;
+	private boolean automaticResubscribe = true;
 	private int maxReconnectDelay = 128000;
 	private boolean skipPortDuringHandshake = false;
 	private Map<String, String> customWebSocketHeaders = null;
@@ -642,6 +644,36 @@ public class MqttConnectOptions {
 	 */
 	public void setAutomaticReconnect(boolean automaticReconnect) {
 		this.automaticReconnect = automaticReconnect;
+	}
+
+	/**
+	 * Returns whether subscriptions are restored after an automatic reconnect that came back
+	 * without a session. The default is true.
+	 *
+	 * @return the automatic resubscribe flag
+	 */
+	public boolean isAutomaticResubscribe() {
+		return automaticResubscribe;
+	}
+
+	/**
+	 * Sets whether the client re-issues its subscriptions after an automatic reconnect whose
+	 * CONNACK reports no session present. With a clean session the broker drops all subscriptions
+	 * on disconnect and the client drops its message listeners, so without this a reconnected
+	 * client stays silent until the application subscribes again. Set to false to take care of
+	 * that yourself in {@link MqttCallbackExtended#connectComplete(boolean, String)}. Only relevant together
+	 * with {@link #setAutomaticReconnect(boolean)}.
+	 *
+	 * <p>
+	 * While enabled, the client retains every topic filter and message listener it subscribed until
+	 * it is unsubscribed, or the client is disconnected or closed. Applications that subscribe to many
+	 * short-lived topic filters should unsubscribe them or disable this to avoid retaining them.
+	 *
+	 * @param automaticResubscribe
+	 *            if true (the default), subscriptions are restored automatically
+	 */
+	public void setAutomaticResubscribe(boolean automaticResubscribe) {
+		this.automaticResubscribe = automaticResubscribe;
 	}
 
 	public int getExecutorServiceTimeout() {

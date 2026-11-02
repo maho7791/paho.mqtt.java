@@ -14,6 +14,7 @@
  *   Ian Craggs - MQTT 3.1.1 support
  *   Ian Craggs - fix bug 469527
  *   James Sutton - Automatic Reconnect & Offline Buffering
+ *   Mark Hoffmann - restore subscriptions after reconnect
  */
 package org.eclipse.paho.client.mqttv3.internal;
 
@@ -93,6 +94,12 @@ public class ConnectActionListener implements IMqttActionListener {
     userToken.internalTok.setClient(this.client); // fix bug 469527 - maybe should be set elsewhere?
 
 	comms.notifyConnect();
+
+    if (reconnect && !token.getSessionPresent()) {
+      // The broker has no session for us, so every subscription made before the connection was
+      // lost is gone. Restore them before the application hears about the reconnect.
+      client.restoreSubscriptions();
+    }
 
     if (userCallback != null) {
       userToken.setUserContext(userContext);
