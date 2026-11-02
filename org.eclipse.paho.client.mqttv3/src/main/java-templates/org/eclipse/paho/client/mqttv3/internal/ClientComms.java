@@ -16,6 +16,7 @@
  *    Ian Craggs - ack control (bug 472172)
  *    James Sutton - checkForActivity Token (bug 473928)
  *    James Sutton - Automatic Reconnect & Offline Buffering.
+ *    Mark Hoffmann - CONNACK timeout (issue #511)
  */
 package org.eclipse.paho.client.mqttv3.internal;
 
@@ -85,6 +86,8 @@ public class ClientComms {
 	private DisconnectedMessageBuffer disconnectedMessageBuffer;
 
 	private ExecutorService executorService;
+	private volatile boolean connackPending; // a connect attempt is waiting for its CONNACK
+	private volatile long connackDeadlineNanos; // ... and must have it by then, see armConnackDeadline
 
 	/**
 	 * Creates a new ClientComms object, using the specified module to handle
@@ -325,6 +328,7 @@ public class ClientComms {
 				log.fine(CLASS_NAME,methodName,"215");
 
 				conState = CONNECTED;
+				clearConnackDeadline();
 				return;
 			}
 		}
@@ -355,6 +359,7 @@ public class ClientComms {
 				return;
 			}
 			stoppingComms = true;
+			clearConnackDeadline();
 
 			//@TRACE 216=state=DISCONNECTING
 			log.fine(CLASS_NAME,methodName,"216");
@@ -677,6 +682,31 @@ public class ClientComms {
 
 
 
+	/**
+	 * Starts the clock for the CONNACK. connectionTimeout so far only covered the socket connect
+	 * and the TLS handshake; an attempt whose TCP connection came up but whose CONNACK never
+	 * arrives stayed in CONNECTING forever, because the receiver keeps looping on read timeouts
+	 * while connecting, the ping sender only starts once connected, and the reconnect cycle only
+	 * moves on from onSuccess/onFailure of the attempt. Half-open connections on mobile networks
+	 * trigger exactly that. The receiver thread, awake once a second anyway, checks the deadline
+	 * through isConnackOverdue(); no additional thread or timer is involved. A connectionTimeout of 0
+	 * keeps waiting indefinitely, as before.
+	 */
+	private void armConnackDeadline() {
+		int timeout = conOptions == null ? 0 : conOptions.getConnectionTimeout();
+		connackDeadlineNanos = System.nanoTime() + timeout * 1000000000L;
+		connackPending = timeout > 0;
+	}
+
+	private void clearConnackDeadline() {
+		connackPending = false;
+	}
+
+	/** True while a connect attempt is pending whose CONNACK is overdue. */
+	public boolean isConnackOverdue() {
+		return connackPending && System.nanoTime() - connackDeadlineNanos > 0 && isConnecting();
+	}
+
 	// Kick off the connect processing in the background so that it does not block. For instance
 	// the socket could take time to create.
 	private class ConnectBG implements Runnable {
@@ -730,6 +760,7 @@ public class ClientComms {
 				sender.start("MQTT Snd: "+getClient().getClientId(), executorService);
 				callback.start("MQTT Call: "+getClient().getClientId(), executorService);
 				internalSend(conPacket, conToken);
+				armConnackDeadline();
 			} catch (MqttException ex) {
 				//@TRACE 212=connect failed: unexpected exception
 				log.fine(CLASS_NAME, methodName, "212", null, ex);
