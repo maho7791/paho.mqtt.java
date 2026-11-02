@@ -15,6 +15,7 @@
  *    Ian Craggs - MQTT 3.1.1 support
  *    James Sutton - Automatic Reconnect & Offline Buffering
  *    James Sutton - MQTT v5
+ *    Mark Hoffmann - automaticResubscribe option
  */
 package org.eclipse.paho.mqttv5.client;
 
@@ -59,6 +60,7 @@ public class MqttConnectionOptions {
 	// Connection Behaviour Properties
 	private String[] serverURIs = null; // List of Servers to connect to in order
 	private boolean automaticReconnect = false; // Automatic Reconnect
+	private boolean automaticResubscribe = true; // Restore subscriptions after a reconnect without session
 	private int automaticReconnectMinDelay = 1; // Time to wait before first automatic reconnection attempt in seconds.
 	private int automaticReconnectMaxDelay = 120; // Max time to wait for automatic reconnection attempts in seconds.
 	private boolean useSubscriptionIdentifiers = true; // Whether to automatically assign subscription identifiers.
@@ -457,6 +459,36 @@ public class MqttConnectionOptions {
 	 */
 	public void setAutomaticReconnect(boolean automaticReconnect) {
 		this.automaticReconnect = automaticReconnect;
+	}
+
+	/**
+	 * Returns whether subscriptions are restored after an automatic reconnect that came back
+	 * without a session. The default is true.
+	 *
+	 * @return the automatic resubscribe flag
+	 */
+	public boolean isAutomaticResubscribe() {
+		return automaticResubscribe;
+	}
+
+	/**
+	 * Sets whether the client re-issues its subscriptions after an automatic reconnect whose
+	 * CONNACK reports no session present. With a clean session the broker drops all subscriptions
+	 * on disconnect and the client drops its message listeners, so without this a reconnected
+	 * client stays silent until the application subscribes again. Set to false to take care of
+	 * that yourself in {@link MqttCallback#connectComplete(boolean, String)}. Only relevant together
+	 * with {@link #setAutomaticReconnect(boolean)}.
+	 *
+	 * <p>
+	 * While enabled, the client retains every topic filter and message listener it subscribed until
+	 * it is unsubscribed, or the client is disconnected or closed. Applications that subscribe to many
+	 * short-lived topic filters should unsubscribe them or disable this to avoid retaining them.
+	 *
+	 * @param automaticResubscribe
+	 *            if true (the default), subscriptions are restored automatically
+	 */
+	public void setAutomaticResubscribe(boolean automaticResubscribe) {
+		this.automaticResubscribe = automaticResubscribe;
 	}
 
 	/**

@@ -12,6 +12,7 @@
  *
  * Contributors:
  *    Dave Locke - initial API and implementation and/or initial documentation
+ *    Mark Hoffmann - CONNACK timeout (issue #511)
  */
 package org.eclipse.paho.mqttv5.client.internal;
 
@@ -168,6 +169,11 @@ public class CommsReceiver implements Runnable {
                                                 else {
                                                     if (!clientComms.isConnected() && !clientComms.isConnecting()) {
                                                          throw new IOException("Connection is lost.");
+                                                    }
+                                                    if (clientComms.isConnackOverdue()) {
+                                                        // @TRACE 858=CONNACK not received within the connection timeout, aborting connect attempt
+                                                        log.severe(CLASS_NAME, methodName, "858");
+                                                        throw ExceptionHelper.createMqttException(MqttClientException.REASON_CODE_CLIENT_TIMEOUT);
                                                     }
                                                 }
 					}
